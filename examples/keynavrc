@@ -1,0 +1,204 @@
+# This is a keynavrc file. Yours should live in
+# $HOME/.keynavrc
+#
+# Lines beginning with '#' are comments.
+# Format is:
+#   keysequence cmd1,cmd2,cmd3...
+#
+# The 'start' command alone is handled specially, in that any key sequence
+# mapped to 'start' will be grabbed when keynav starts up so you can invoke it
+# to activate keynav. The remaining keys are only recognized while keynav is
+# active
+#
+# Project page; http://www.semicomplete.com/projects/keynav
+#? --------  KEYNAV  --------
+
+daemonize  # background keynav
+clear      # clear all previous keybindings
+grid-nav-exit 5x3
+
+super+minus start, grid 26x18, grid-nav on
+Tab grid-nav off, grid 5x3
+q cell-select 1x1, warp, click 1, end
+w cell-select 2x1, warp, click 1, end
+e cell-select 3x1, warp, click 1, end
+r cell-select 4x1, warp, click 1, end
+t cell-select 5x1, warp, click 1, end
+a cell-select 1x2, warp, click 1, end
+s cell-select 2x2, warp, click 1, end
+d cell-select 3x2, warp, click 1, end
+f cell-select 4x2, warp, click 1, end
+g cell-select 5x2, warp, click 1, end
+z cell-select 1x3, warp, click 1, end
+x cell-select 2x3, warp, click 1, end
+c cell-select 3x3, warp, click 1, end
+v cell-select 4x3, warp, click 1, end
+b cell-select 5x3, warp, click 1, end
+
+ctrl+q cell-select 1x1, warp, click 2, end
+ctrl+w cell-select 2x1, warp, click 2, end
+ctrl+e cell-select 3x1, warp, click 2, end
+ctrl+r cell-select 4x1, warp, click 2, end
+ctrl+t cell-select 5x1, warp, click 2, end
+ctrl+a cell-select 1x2, warp, click 2, end
+ctrl+s cell-select 2x2, warp, click 2, end
+ctrl+d cell-select 3x2, warp, click 2, end
+ctrl+f cell-select 4x2, warp, click 2, end
+ctrl+g cell-select 5x2, warp, click 2, end
+ctrl+z cell-select 1x3, warp, click 2, end
+ctrl+x cell-select 2x3, warp, click 2, end
+ctrl+c cell-select 3x3, warp, click 2, end
+ctrl+v cell-select 4x3, warp, click 2, end
+ctrl+b cell-select 5x3, warp, click 2, end
+
+shift+q cell-select 1x1, warp, click 3, end
+shift+w cell-select 2x1, warp, click 3, end
+shift+e cell-select 3x1, warp, click 3, end
+shift+r cell-select 4x1, warp, click 3, end
+shift+t cell-select 5x1, warp, click 3, end
+shift+a cell-select 1x2, warp, click 3, end
+shift+s cell-select 2x2, warp, click 3, end
+shift+d cell-select 3x2, warp, click 3, end
+shift+f cell-select 4x2, warp, click 3, end
+shift+g cell-select 5x2, warp, click 3, end
+shift+z cell-select 1x3, warp, click 3, end
+shift+x cell-select 2x3, warp, click 3, end
+shift+c cell-select 3x3, warp, click 3, end
+shift+v cell-select 4x3, warp, click 3, end
+shift+b cell-select 5x3, warp, click 3, end
+
+ctrl+shift+q cell-select 1x1, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+w cell-select 2x1, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+e cell-select 3x1, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+r cell-select 4x1, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+t cell-select 5x1, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+a cell-select 1x2, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+s cell-select 2x2, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+d cell-select 3x2, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+f cell-select 4x2, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+g cell-select 5x2, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+z cell-select 1x3, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+x cell-select 2x3, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+c cell-select 3x3, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+v cell-select 4x3, warp, drag 1, start, grid 26x18, grid-nav on
+ctrl+shift+b cell-select 5x3, warp, drag 1, start, grid 26x18, grid-nav on
+
+
+#alt+q record ~/.config/keynav/keynav_macros
+#shift+at playback
+#ctrl+semicolon start, sh "exec transset-df -i $(xdotool search --class keynav) 0.3"
+alt+n grid 26x18, grid-nav on
+#ctrl+semicolon start
+#ctrl+semicolon start,cut-left .95, cut-up .95, move-right 50, move-down 20
+#alt+semicolon start,move-right
+#? KEYNAV exit
+Escape end
+ctrl+bracketleft end
+h move-left
+j move-down
+k move-up
+l move-right
+y move-left,move-up
+u move-right,move-up
+n move-left,move-down
+m move-right,move-down
+#? KEYNAV center cursor and click
+space warp,click 1
+#? KEYNAV center cursor, click and exit
+Return warp,click 1,end
+#? KEYNAV move cursor to the screen origin border
+#0 sh "xdotool mousemove 0 0", end
+0 move-cursor 0x0, end
+#? KEYNAV move cursor to the center (,)
+semicolon warp
+#? KEYNAV click
+1 click 1
+#? KEYNAV middle click
+2 click 2
+#? KEYNAV secondary click
+3 click 3
+#? KEYNAV mouse wheel up
+4 click 4
+#? KEYNAV mouse wheel down
+5 click 5
+#? KEYNAV mouse wheel left
+6 click 6
+#? KEYNAV mouse wheel right
+7 click 7
+#? KEYNAV double click
+9 doubleclick 1
+ctrl+1 drag 1
+ctrl+2 drag 2
+ctrl+3 drag 3
+#1 cell-select 1x1,warp,end
+#2 cell-select 1x2,warp,end
+#3 cell-select 2x1,warp,end
+#4 cell-select 2x2,warp,end
+
+# Zoom to the current window
+#shift+w windowzoom
+#shift+c cursorzoom 100 100
+#ctrl+w windowzoom
+
+# Handy for holding ctrl while using keynav:
+ctrl+h cut-left
+ctrl+j cut-down
+ctrl+k cut-up
+ctrl+l cut-right
+ctrl+y cut-left,cut-up
+ctrl+u cut-right,cut-up
+ctrl+b cut-left,cut-down
+ctrl+n cut-right,cut-down
+
+### Example using the 'sh' command.
+# This xdotool invocation require xdotool >= 2.20100623 for 'command chaining'
+#shift+g sh "xdotool search --title -- '- Google Chrome' windowactivate key --window 0 --clearmodifiers ctrl+l",end
+
+# Paste!
+#shift+v sh "xdotool key shift+Insert",end
+#ctrl+v sh "xdotool key shift+Insert",end
+
+# Activate chrome, make a new tab, paste in the url bar, then press return.
+# This xdotool invocation require xdotool >= 2.20100623 for 'command chaining'
+#t sh "xdotool search --title -- '- Google Chrome' windowactivate --sync key --window 0 --clearmodifiers ctrl+t shift+Insert Return",end
+
+### Drag examples
+# Start drag holding the left mouse button
+#q drag 1
+# Start drag holding middle mouse + control and shift
+#w warp
+
+### History
+minus history-back
+
+### Example of cut and move without the default values
+#h cut-left .75
+#j cut-down .75
+#k cut-up .75
+#l cut-right .75
+#shift+h move-left .50
+#shift+j move-down .50
+#shift+k move-up .50
+#shift+l move-right .50
+
+### Example using a 2-row, 3-column grid, 
+# mapped to Insert/Home/PageUp/etc...
+#6 grid 2x3
+#Insert cell-select 1x1
+#Home cell-select 1x2
+#Prior cell-select 1x3   # PageUp
+#Delete cell-select 2x1
+#End cell-select 2x2
+#Next cell-select 2x3   # PageDown
+
+### Example using a 3x3 grid with nethack-vi keys
+#ctrl+semicolon start, grid 3x3
+#h cell-select 2x1      # left
+#j cell-select 3x2      # down
+#k cell-select 1x2      # up
+#l cell-select 2x3      # right
+#y cell-select 1x1      # up-left
+#u cell-select 1x3      # up-right
+#b cell-select 3x1      # down-left
+#n cell-select 3x3      # down-right
+#period cell-select 2x2 # center
