@@ -55,6 +55,8 @@ struct appstate {
   enum { GRID_LABEL_NONE, GRID_LABEL_AA } grid_label;
   int grid_nav_col;
   int grid_nav_row;
+  int grid_nav_col_exit;
+  int grid_nav_row_exit;
 };
 
 typedef enum { HANDLE_CONTINUE, HANDLE_STOP } handler_info_t;
@@ -122,6 +124,8 @@ static struct appstate appstate = {
   .dragging = 0,
   .recording = record_off,
   .grid_nav = 0,
+  .grid_nav_col_exit = 0,
+  .grid_nav_row_exit = 0,
 };
 
 static int drag_button = 0;
@@ -148,6 +152,7 @@ void cmd_end(char *args);
 void cmd_toggle_start(char *args);
 void cmd_grid(char *args);
 void cmd_grid_nav(char *args);
+void cmd_grid_nav_exit(char *args);
 void cmd_history_back(char *args);
 void cmd_loadconfig(char *args);
 void cmd_move_down(char *args);
@@ -214,6 +219,7 @@ dispatch_t dispatch[] = {
   // Grid commands
   "grid", cmd_grid,
   "grid-nav", cmd_grid_nav,
+  "grid-nav-exit", cmd_grid_nav_exit,
   "cell-select", cmd_cell_select,
 
   // Mouse activity
@@ -604,6 +610,8 @@ int parse_config_line(char *orig_line) {
     handle_commands(keyseq);
   } else if (strcmp(keyseq, "loadconfig") == 0) {
     handle_commands(keyseq);
+  } else if (strcmp(keyseq, "grid-nav-exit") == 0) {
+    handle_commands(orig_line);
   } else {
     keycode = parse_keycode(keyseq);
     if (keycode == 0) {
@@ -795,7 +803,7 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
   y_off = info->border_thickness / 2;
 
   cairo_text_extents_t te;
-#define FONTSIZE 18
+#define FONTSIZE 15
   if (draw) {
     cairo_new_path(canvas_cairo);
     cairo_select_font_face(canvas_cairo, "Courier", CAIRO_FONT_SLANT_NORMAL,
@@ -821,8 +829,8 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
   for (col = 0; col < info->grid_cols; col++) {
     label[0] = 'A';
     for (row = 0; row < info->grid_rows; row++) {
-      int rectwidth = te.width + 25;
-      int rectheight = te.height + 8;
+      int rectwidth = te.width + 3;
+      int rectheight = te.height + 3;
       int xpos = cell_width * col + x_off + (cell_width / 2);
       int ypos = cell_height * row + y_off + (cell_height / 2);
 
@@ -852,7 +860,7 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
         }
         cairo_fill(canvas_cairo);
         cairo_append_path(canvas_cairo, pathcopy);
-        cairo_set_source_rgb(canvas_cairo, .8, .8, 0);
+        cairo_set_source_rgb(canvas_cairo, .6, .6, 0);
         cairo_stroke(canvas_cairo);
         cairo_path_destroy(pathcopy);
 
@@ -938,7 +946,7 @@ void cmd_start(char *args) {
   wininfo.grid_rows = 2;
   wininfo.grid_cols = 2;
 
-  wininfo.border_thickness = 3;
+  wininfo.border_thickness = 2;
   wininfo.center_cut_size = 3;
 
   if (ISACTIVE)
@@ -1276,6 +1284,25 @@ void cmd_grid_nav(char *args) {
   }
 
   appstate.need_draw = 1;
+}
+
+void cmd_grid_nav_exit(char *args) {
+  int grid_cols, grid_rows;
+
+  // Try to parse 'NxN' where N is a number.
+  if (sscanf(args, "%dx%d", &grid_cols, &grid_rows) <= 0) {
+    // Otherwise, try parsing a number.
+    grid_cols = grid_rows = atoi(args);
+  }
+
+  if (grid_cols <= 0 || grid_rows <= 0) {
+    fprintf(stderr, "Invalid grid segmentation: %dx%d\n", grid_cols, grid_rows);
+    fprintf(stderr, "Grid x and y must both be greater than 0.\n");
+    return;
+  }
+
+  appstate.grid_nav_col_exit = grid_cols;
+  appstate.grid_nav_row_exit = grid_rows;
 }
 
 void cmd_grid(char *args) {
@@ -1620,6 +1647,10 @@ handler_info_t handle_gridnav(XKeyEvent *e) {
 
   if (sym == XK_Escape) {
     cmd_grid_nav("off");
+    if (appstate.grid_nav_col_exit)
+      wininfo.grid_cols = appstate.grid_nav_col_exit;
+    if (appstate.grid_nav_row_exit)
+      wininfo.grid_rows = appstate.grid_nav_row_exit;
     update();
     return HANDLE_STOP;
   }
@@ -1646,6 +1677,16 @@ handler_info_t handle_gridnav(XKeyEvent *e) {
 
     /* We have a full set of coordinates now; select that grid position */
     cell_select(appstate.grid_nav_col, appstate.grid_nav_row);
+
+    if (appstate.grid_nav_col_exit)
+      wininfo.grid_cols = appstate.grid_nav_col_exit;
+    if (appstate.grid_nav_row_exit)
+      wininfo.grid_rows = appstate.grid_nav_row_exit;
+    if (appstate.grid_nav_col_exit && appstate.grid_nav_row_exit) {
+      cmd_grid_nav("off");
+      cmd_warp(NULL);
+    }
+
     update();
     save_history_point();
     appstate.grid_nav_row = -1;
@@ -1864,6 +1905,24 @@ int query_current_screen_xinerama() {
   Window root = viewports[0].root;
   XQueryPointer(dpy, root, &dummywin, &dummywin,
                 &x, &y, &dummyint, &dummyint, &dummyuint);
+  /* attempt to change x and y based on focus */
+  XGetInputFocus(dpy, &dummywin, &dummyint);
+  if(dummywin != None) {
+    Window parent, dummy, *pdummy;
+    XWindowAttributes wa;
+
+    /* find top-level window containing current input focus */
+    while(XQueryTree(dpy, dummywin, &dummy, &parent, &pdummy, &dummyint)) {
+      if(parent == root || parent == PointerRoot || parent == None)
+        break;
+
+      dummywin = parent;
+    }
+
+    /* find xinerama screen if we have a valid focus */
+    if(dummywin != root && XGetWindowAttributes(dpy, dummywin, &wa))
+      x = wa.x + wa.width, y = wa.y + wa.height;
+  }
 
   /* Figure which display the cursor is on */
   for (i = 0; i < nviewports; i++) {
