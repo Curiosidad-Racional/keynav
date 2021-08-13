@@ -159,6 +159,7 @@ void cmd_move_down(char *args);
 void cmd_move_left(char *args);
 void cmd_move_right(char *args);
 void cmd_move_up(char *args);
+void cmd_move_cursor(char *args);
 void cmd_quit(char *args);
 void cmd_record(char *args);
 void cmd_playback(char *args);
@@ -213,6 +214,7 @@ dispatch_t dispatch[] = {
   "move-down", cmd_move_down,
   "move-left", cmd_move_left,
   "move-right", cmd_move_right,
+  "move-cursor", cmd_move_cursor,
   "cursorzoom", cmd_cursorzoom,
   "windowzoom", cmd_windowzoom,
 
@@ -924,6 +926,25 @@ void grab_keyboard() {
   //printf("Got grab!\n");
 }
 
+void move_to_point(int x, int y) {
+
+  if (mouseinfo.x != -1 && mouseinfo.y != -1) {
+    closepixel(dpy, zone, &mouseinfo);
+  }
+
+  /* Open pixels hould be relative to the window coordinates,
+   * not screen coordinates. */
+  mouseinfo.x = x - wininfo.x;
+  mouseinfo.y = y - wininfo.y;
+  openpixel(dpy, zone, &mouseinfo);
+
+  xdo_move_mouse(xdo, x, y, viewports[wininfo.curviewport].screen_num);
+  xdo_wait_for_mouse_move_to(xdo, x, y);
+
+  /* TODO(sissel): do we need to open again? */
+  openpixel(dpy, zone, &mouseinfo);
+}
+
 void cmd_start(char *args) {
   XSetWindowAttributes winattr;
   int i;
@@ -1132,6 +1153,22 @@ void cmd_move_right(char *args) {
   wininfo.x += percent_of(wininfo.w, args, 1);
 }
 
+void cmd_move_cursor(char *args) {
+  int x, y;
+  // Try to parse 'NxN' where N is a number.
+  if (sscanf(args, "%dx%d", &x, &y) <= 0) {
+    // Otherwise, try parsing a number.
+    x = y = atoi(args);
+  }
+
+  if (x < 0 || y < 0) {
+    fprintf(stderr, "Invalid position: %dx%d\n", x, y);
+    fprintf(stderr, "Grid x and y must both be greater than 0 or equal.\n");
+    return;
+  }
+  move_to_point(x, y);
+}
+
 void cmd_cursorzoom(char *args) {
   int xradius = 0, yradius = 0, width = 0, height = 0;
   int xloc, yloc;
@@ -1179,25 +1216,8 @@ void cmd_windowzoom(char *args) {
 void cmd_warp(char *args) {
   if (!ISACTIVE)
     return;
-  int x, y;
-  x = wininfo.x + wininfo.w / 2;
-  y = wininfo.y + wininfo.h / 2;
-
-  if (mouseinfo.x != -1 && mouseinfo.y != -1) {
-    closepixel(dpy, zone, &mouseinfo);
-  }
-
-  /* Open pixels hould be relative to the window coordinates,
-   * not screen coordinates. */
-  mouseinfo.x = x - wininfo.x;
-  mouseinfo.y = y - wininfo.y;
-  openpixel(dpy, zone, &mouseinfo);
-
-  xdo_move_mouse(xdo, x, y, viewports[wininfo.curviewport].screen_num);
-  xdo_wait_for_mouse_move_to(xdo, x, y);
-
-  /* TODO(sissel): do we need to open again? */
-  openpixel(dpy, zone, &mouseinfo);
+  move_to_point(wininfo.x + wininfo.w / 2,
+                wininfo.y + wininfo.h / 2);
 }
 
 void cmd_click(char *args) {
