@@ -57,9 +57,10 @@ struct appstate {
   int grid_nav_row;
   int grid_nav_col_exit;
   int grid_nav_row_exit;
+  int click_default;
 };
 
-typedef enum { HANDLE_CONTINUE, HANDLE_STOP } handler_info_t;
+typedef enum { HANDLE_CONTINUE, HANDLE_STOP, HANDLE_END } handler_info_t;
 
 typedef struct recording {
   int keycode;
@@ -78,7 +79,6 @@ typedef struct wininfo {
   int grid_rows;
   int grid_cols;
   int border_thickness;
-  int center_cut_size;
   int curviewport;
 } wininfo_t;
 
@@ -126,10 +126,12 @@ static struct appstate appstate = {
   .grid_nav = 0,
   .grid_nav_col_exit = 0,
   .grid_nav_row_exit = 0,
+  .click_default = 0,
 };
 
 static int drag_button = 0;
 static char drag_modkeys[128];
+static char default_evt[32] = "click 1";
 
 /* history tracking */
 #define WININFO_MAXHIST (100)
@@ -140,6 +142,9 @@ void defaults();
 
 void cmd_cell_select(char *args);
 void cmd_click(char *args);
+void cmd_click_default(char *args);
+void cmd_default_event(char *args);
+void cmd_set_default_event(char *args);
 void cmd_cursorzoom(char *args);
 void cmd_cut_down(char *args);
 void cmd_cut_left(char *args);
@@ -149,6 +154,8 @@ void cmd_daemonize(char *args);
 void cmd_doubleclick(char *args);
 void cmd_drag(char *args);
 void cmd_end(char *args);
+void cmd_end_if_click_default(char *args);
+void cmd_end_if_not_default_event(char *args);
 void cmd_toggle_start(char *args);
 void cmd_grid(char *args);
 void cmd_grid_nav(char *args);
@@ -227,6 +234,9 @@ dispatch_t dispatch[] = {
   // Mouse activity
   "warp", cmd_warp,
   "click", cmd_click,
+  "click-default", cmd_click_default,
+  "default-event", cmd_default_event,
+  "set-default-event", cmd_set_default_event,
   "doubleclick", cmd_doubleclick,
   "drag", cmd_drag,
 
@@ -236,6 +246,8 @@ dispatch_t dispatch[] = {
   "sh", cmd_shell,
   "start", cmd_start,
   "end", cmd_end,
+  "end-if-click-default", cmd_end_if_click_default,
+  "end-if-not-default-event", cmd_end_if_not_default_event,
   "toggle-start", cmd_toggle_start,
   "history-back", cmd_history_back,
   "quit", cmd_quit,
@@ -702,68 +714,46 @@ void updategrid(Window win, struct wininfo *info, int apply_clip, int draw) {
   cell_width = (w / info->grid_cols);
   cell_height = (h / info->grid_rows);
 
-  int x_total_offset = 0;
+  double x_total_offset = 0;
 
   /* clip vertically */
-  for (i = 0; i <= info->grid_cols; i++) {
-    int x_off = 0;
-    if (i > 0) {
-        x_off = -info->border_thickness / 2;
-    }
-
+  for (i = 0; i <= info->grid_cols; ++i) {
     if (i == info->grid_cols) {
         x_total_offset = info->w - 1;
     }
-
-    int x_w_off = 0;
-    if (i == 0 || i == info->grid_cols) {
-        x_w_off = info->border_thickness / 2;
-    }
-
     cairo_move_to(canvas_cairo, x_total_offset + 1, 0);
     cairo_line_to(canvas_cairo, x_total_offset + 1, info->h);
 
-    clip_rectangles[rect].x = x_total_offset + x_off;
+    clip_rectangles[rect].x = x_total_offset;
     clip_rectangles[rect].y = 0;
-    clip_rectangles[rect].width = info->border_thickness - x_w_off;
+
+    clip_rectangles[rect].width = info->border_thickness;
     clip_rectangles[rect].height = info->h;
-    rect++;
+    ++rect;
 
     x_total_offset += cell_width;
   }
 
-  int y_total_offset = 0;
+  double y_total_offset = 0;
 
   /* clip horizontally */
-  for (i = 0; i <= info->grid_rows; i++) {
-    int y_off = 0;
-    if (i > 0) {
-        y_off = -info->border_thickness / 2;
-    }
-
+  for (i = 0; i <= info->grid_rows; ++i) {
     if (i == info->grid_rows) {
         y_total_offset = info->h - 1;
-    }
-
-    int y_w_off = 0;
-    if (i == 0 || i == info->grid_rows) {
-        y_w_off = info->border_thickness / 2;
     }
 
     cairo_move_to(canvas_cairo, 0, y_total_offset + 1);
     cairo_line_to(canvas_cairo, info->w, y_total_offset + 1);
 
     clip_rectangles[rect].x = 0;
-    clip_rectangles[rect].y = y_total_offset + y_off;
+    clip_rectangles[rect].y = y_total_offset;
 
     clip_rectangles[rect].width = info->w;
-    clip_rectangles[rect].height = info->border_thickness - y_w_off;
-    rect++;
+    clip_rectangles[rect].height = info->border_thickness;
+    ++rect;
 
     y_total_offset += cell_height;
   }
-
-  cairo_path_t *path = cairo_copy_path(canvas_cairo);
 
 #ifdef PROFILE_THINGS
   clock_gettime(CLOCK_MONOTONIC, &end);
@@ -787,8 +777,6 @@ void updategrid(Window win, struct wininfo *info, int apply_clip, int draw) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
   } /* if draw */
-
-  cairo_path_destroy(path);
 }
 
 void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) {
@@ -805,12 +793,11 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
   y_off = info->border_thickness / 2;
 
   cairo_text_extents_t te;
-#define FONTSIZE 15
   if (draw) {
     cairo_new_path(canvas_cairo);
-    cairo_select_font_face(canvas_cairo, "Courier", CAIRO_FONT_SLANT_NORMAL,
-                           CAIRO_FONT_WEIGHT_BOLD);
-    cairo_set_font_size(canvas_cairo, FONTSIZE);
+    cairo_select_font_face(canvas_cairo, "DejaVuSansMono", CAIRO_FONT_SLANT_NORMAL,
+                           CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(canvas_cairo, 14);
     cairo_text_extents(canvas_cairo, "AA", &te);
   }
 
@@ -825,13 +812,15 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
   //printf("bearing: %f,%f\n", te.x_bearing, te.y_bearing);
   //printf("size: %f,%f\n", te.width, te.height);
 
+  char labels[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
   char label[3] = "AA";
 
   int row_selected = 0;
   for (col = 0; col < info->grid_cols; col++) {
-    label[0] = 'A';
+    label[1] = labels[col];
     for (row = 0; row < info->grid_rows; row++) {
-      int rectwidth = te.width + 3;
+      label[0] = labels[row];
+      int rectwidth = te.width;
       int rectheight = te.height + 3;
       int xpos = cell_width * col + x_off + (cell_width / 2);
       int ypos = cell_height * row + y_off + (cell_height / 2);
@@ -849,11 +838,11 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
       cairo_rectangle(canvas_cairo,
                       xpos - rectwidth / 2 + te.x_bearing / 2,
                       ypos - rectheight / 2 + te.y_bearing / 2,
-                      rectwidth, rectheight);
+                      rectwidth + 1, rectheight + 1);
       if (draw) {
-        cairo_path_t *pathcopy;
-        pathcopy = cairo_copy_path(canvas_cairo);
-        cairo_set_line_width(shape_cairo, 2);
+        //cairo_path_t *pathcopy;
+        //pathcopy = cairo_copy_path(canvas_cairo);
+        cairo_set_line_width(shape_cairo, 1);
 
         if (row_selected) {
           cairo_set_source_rgb(canvas_cairo, 0, .3, .3);
@@ -861,10 +850,10 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
           cairo_set_source_rgb(canvas_cairo, 0, .2, 0);
         }
         cairo_fill(canvas_cairo);
-        cairo_append_path(canvas_cairo, pathcopy);
+        //cairo_append_path(canvas_cairo, pathcopy);
         cairo_set_source_rgb(canvas_cairo, .6, .6, 0);
         cairo_stroke(canvas_cairo);
-        cairo_path_destroy(pathcopy);
+        //cairo_path_destroy(pathcopy);
 
         if (row_selected) {
           cairo_set_source_rgb(canvas_cairo, 1, 1, 1);
@@ -883,9 +872,7 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
         clip_rectangles[rect].height =  rectheight + 1;
         rect++;
       }
-      label[0]++;
     }
-    label[1]++;
   } /* Draw rectangles and text */
 } /* void updategridtext */
 
@@ -968,7 +955,6 @@ void cmd_start(char *args) {
   wininfo.grid_cols = 2;
 
   wininfo.border_thickness = 2;
-  wininfo.center_cut_size = 3;
 
   if (ISACTIVE)
     return;
@@ -1046,6 +1032,20 @@ void cmd_end(char *args) {
   XUngrabKeyboard(dpy, CurrentTime);
 
   zone = 0;
+}
+
+void cmd_end_if_click_default(char *args) {
+  if (!ISACTIVE)
+    return;
+  if (appstate.click_default)
+      cmd_end(args);
+}
+
+void cmd_end_if_not_default_event(char *args) {
+  if (!ISACTIVE)
+    return;
+  if (strncmp(args, default_evt, strlen(args)) != 0)
+    cmd_end(args);
 }
 
 void cmd_toggle_start(char *args) {
@@ -1220,6 +1220,23 @@ void cmd_warp(char *args) {
                 wininfo.y + wininfo.h / 2);
 }
 
+void cmd_click_default(char *args) {
+  int button;
+  button = atoi(args);
+  if (button >= 0)
+      appstate.click_default = button;
+  else
+    fprintf(stderr, "Negative mouse button is invalid: %d\n", button);
+}
+
+void cmd_default_event(char *args) {
+  handle_commands(default_evt);
+}
+
+void cmd_set_default_event(char *args) {
+  strcpy(default_evt, args);
+}
+
 void cmd_click(char *args) {
   if (!ISACTIVE)
     return;
@@ -1228,8 +1245,8 @@ void cmd_click(char *args) {
   button = atoi(args);
   if (button > 0)
     xdo_click_window(xdo, CURRENTWINDOW, button);
-  else
-    fprintf(stderr, "Negative mouse button is invalid: %d\n", button);
+  else if (appstate.click_default > 0)
+    xdo_click_window(xdo, CURRENTWINDOW, appstate.click_default);
 }
 
 void cmd_doubleclick(char *args) {
@@ -1346,7 +1363,6 @@ void cmd_grid(char *args) {
 
 void cmd_cell_select(char *args) {
   int row, col, z;
-  int cell_width, cell_height;
   row = col = z = 0;
 
   // Try to parse 'NxM' where N and M are a number.
@@ -1387,10 +1403,13 @@ void cmd_cell_select(char *args) {
 
 void cell_select(int col, int row) {
   //printf("cell_select: %d, %d\n", col, row);
-  wininfo.w = wininfo.w / wininfo.grid_cols;
-  wininfo.h = wininfo.h / wininfo.grid_rows;
-  wininfo.x = wininfo.x + (wininfo.w * (col));
-  wininfo.y = wininfo.y + (wininfo.h * (row));
+  double w, h;
+  w = (double)wininfo.w / (double)wininfo.grid_cols;
+  h = (double)wininfo.h / (double)wininfo.grid_rows;
+  wininfo.w = w;
+  wininfo.h = h;
+  wininfo.x = wininfo.x + (w * (double)col);
+  wininfo.y = wininfo.y + (h * (double)row);
 }
 
 void cmd_daemonize(char *args) {
@@ -1614,8 +1633,13 @@ void handle_keypress(XKeyEvent *e) {
   }
 
   if (appstate.grid_nav) {
-    if (handle_gridnav(e) == HANDLE_STOP) {
-      return;
+    switch (handle_gridnav(e)) {
+      case HANDLE_STOP:
+        return;
+        break;
+      case HANDLE_END:
+        cmd_end(NULL);
+        break;
     }
   }
 
@@ -1666,13 +1690,14 @@ handler_info_t handle_gridnav(XKeyEvent *e) {
   char *key = XKeysymToString(sym);
 
   if (sym == XK_Escape) {
-    cmd_grid_nav("off");
-    if (appstate.grid_nav_col_exit)
-      wininfo.grid_cols = appstate.grid_nav_col_exit;
-    if (appstate.grid_nav_row_exit)
-      wininfo.grid_rows = appstate.grid_nav_row_exit;
-    update();
-    return HANDLE_STOP;
+    return HANDLE_END;
+    /* cmd_grid_nav("off"); */
+    /* if (appstate.grid_nav_col_exit) */
+    /*   wininfo.grid_cols = appstate.grid_nav_col_exit; */
+    /* if (appstate.grid_nav_row_exit) */
+    /*   wininfo.grid_rows = appstate.grid_nav_row_exit; */
+    /* update(); */
+    /* return HANDLE_STOP; */
   }
 
   if (!(strlen(key) == 1 && isalpha(*key))) {
@@ -1698,16 +1723,17 @@ handler_info_t handle_gridnav(XKeyEvent *e) {
     /* We have a full set of coordinates now; select that grid position */
     cell_select(appstate.grid_nav_col, appstate.grid_nav_row);
 
-    if (appstate.grid_nav_col_exit)
-      wininfo.grid_cols = appstate.grid_nav_col_exit;
-    if (appstate.grid_nav_row_exit)
-      wininfo.grid_rows = appstate.grid_nav_row_exit;
-    if (appstate.grid_nav_col_exit && appstate.grid_nav_row_exit) {
+    if (wininfo.w < 16 * wininfo.grid_cols ||
+        wininfo.h < 16 * wininfo.grid_rows) {
       cmd_grid_nav("off");
+      if (appstate.grid_nav_col_exit)
+        wininfo.grid_cols = appstate.grid_nav_col_exit;
+      if (appstate.grid_nav_row_exit)
+        wininfo.grid_rows = appstate.grid_nav_row_exit;
+      update();
       cmd_warp(NULL);
-    }
-
-    update();
+    } else
+      update();
     save_history_point();
     appstate.grid_nav_row = -1;
     appstate.grid_nav_col = -1;
@@ -2144,8 +2170,7 @@ int main(int argc, char **argv) {
 
   if (daemonize) {
     printf("Daemonizing now...\n");
-    daemon(0, 0);
-    is_daemon = True;
+    is_daemon = !daemon(0, 0);
   }
 
   while (1) {
