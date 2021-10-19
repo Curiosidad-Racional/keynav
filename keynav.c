@@ -22,6 +22,7 @@
 #include <X11/extensions/shape.h>
 #include <X11/extensions/Xinerama.h>
 #include <X11/extensions/Xrandr.h>
+#include <X11/extensions/Xfixes.h>
 #include <glib.h>
 #include <cairo-xlib.h>
 
@@ -104,6 +105,7 @@ static int nviewports = 0;
 static int xinerama = 0;
 static int daemonize = 0;
 static int is_daemon = False;
+static int cursor_showing = True;
 
 static Display *dpy;
 static Window zone;
@@ -167,6 +169,9 @@ void cmd_move_left(char *args);
 void cmd_move_right(char *args);
 void cmd_move_up(char *args);
 void cmd_move_cursor(char *args);
+void cmd_show_cursor(char *args);
+void cmd_hide_cursor(char *args);
+void cmd_toggle_cursor(char *args);
 void cmd_quit(char *args);
 void cmd_record(char *args);
 void cmd_playback(char *args);
@@ -222,6 +227,9 @@ dispatch_t dispatch[] = {
   "move-left", cmd_move_left,
   "move-right", cmd_move_right,
   "move-cursor", cmd_move_cursor,
+  "show-cursor", cmd_show_cursor,
+  "hide-cursor", cmd_hide_cursor,
+  "toggle-cursor", cmd_toggle_cursor,
   "cursorzoom", cmd_cursorzoom,
   "windowzoom", cmd_windowzoom,
 
@@ -623,6 +631,8 @@ int parse_config_line(char *orig_line) {
   } else if (strcmp(keyseq, "daemonize") == 0) {
     handle_commands(keyseq);
   } else if (strcmp(keyseq, "loadconfig") == 0) {
+    handle_commands(keyseq);
+  } else if (strcmp(keyseq, "hide-cursor") == 0) {
     handle_commands(keyseq);
   } else if (strcmp(keyseq, "grid-nav-exit") == 0) {
     handle_commands(orig_line);
@@ -1167,6 +1177,34 @@ void cmd_move_cursor(char *args) {
     return;
   }
   move_to_point(x, y);
+}
+
+void cmd_show_cursor(char *args) {
+  if (!cursor_showing) {
+    XFixesShowCursor(dpy, DefaultRootWindow(dpy));
+    cursor_showing = True;
+    XFlush(dpy);
+  }
+}
+
+void cmd_hide_cursor(char *args) {
+  if (cursor_showing) {
+    XFixesHideCursor(dpy, DefaultRootWindow(dpy));
+    cursor_showing = False;
+    XFlush(dpy);
+  }
+}
+
+void cmd_toggle_cursor(char *args) {
+  if (cursor_showing) {
+    XFixesHideCursor(dpy, DefaultRootWindow(dpy));
+    cursor_showing = False;
+    XFlush(dpy);
+  } else {
+    XFixesShowCursor(dpy, DefaultRootWindow(dpy));
+    cursor_showing = True;
+    XFlush(dpy);
+  }
 }
 
 void cmd_cursorzoom(char *args) {

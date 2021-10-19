@@ -9,7 +9,7 @@ LDFLAGS+=$(shell pkg-config --libs xinerama 2> /dev/null)
 LDFLAGS+=$(shell pkg-config --libs glib-2.0 2> /dev/null)
 LDFLAGS+=$(shell pkg-config --libs x11 2> /dev/null)
 LDFLAGS+=$(shell pkg-config --libs xrandr 2> /dev/null)
-LDFLAGS+=-Xlinker -rpath=/usr/local/lib
+LDFLAGS+=-lXfixes -Xlinker -rpath=/usr/local/lib
 
 PREFIX?=/usr
 
