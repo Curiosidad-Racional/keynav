@@ -822,7 +822,7 @@ void updategridtext(Window win, struct wininfo *info, int apply_clip, int draw) 
   //printf("bearing: %f,%f\n", te.x_bearing, te.y_bearing);
   //printf("size: %f,%f\n", te.width, te.height);
 
-  char labels[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+  char labels[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   char label[3] = "AA";
 
   int row_selected = 0;
@@ -924,6 +924,11 @@ void grab_keyboard() {
 }
 
 void move_to_point(int x, int y) {
+  int posx, posy, screen_num;
+  xdo_get_mouse_location(xdo, &posx, &posy, &screen_num);
+  if (x == posx && y == posy &&
+    viewports[wininfo.curviewport].screen_num == screen_num)
+    return;
 
   if (mouseinfo.x != -1 && mouseinfo.y != -1) {
     closepixel(dpy, zone, &mouseinfo);
@@ -1262,7 +1267,7 @@ void cmd_click_default(char *args) {
   int button;
   button = atoi(args);
   if (button >= 0)
-      appstate.click_default = button;
+    appstate.click_default = button;
   else
     fprintf(stderr, "Negative mouse button is invalid: %d\n", button);
 }
