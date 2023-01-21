@@ -930,6 +930,11 @@ void move_to_point(int x, int y) {
     viewports[wininfo.curviewport].screen_num == screen_num)
     return;
 
+  if (x >= viewports[wininfo.curviewport].x + viewports[wininfo.curviewport].w)
+      x = viewports[wininfo.curviewport].x + viewports[wininfo.curviewport].w - 1;
+  if (y >= viewports[wininfo.curviewport].y + viewports[wininfo.curviewport].h)
+      y = viewports[wininfo.curviewport].y + viewports[wininfo.curviewport].h - 1;
+
   if (mouseinfo.x != -1 && mouseinfo.y != -1) {
     closepixel(dpy, zone, &mouseinfo);
   }
